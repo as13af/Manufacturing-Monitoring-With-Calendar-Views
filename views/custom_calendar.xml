@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Calendar View -->
+    <record id="view_custom_calendar_report_calendar" model="ir.ui.view">
+        <field name="name">custom.calendar.report.calendar</field>
+        <field name="model">custom.calendar.report</field>
+        <field name="arch" type="xml">
+            <calendar string="Custom Calendar Report" date_start="date">
+                <field name="date"/>
+                <field name="product_id"/>
+                <field name="used_in_refs" widget="many2many_tags" options="{'no_create': True, 'open_action': 'action_open_product_form'}"/>
+                <field name="bom_refs" widget="many2many_tags" options="{'no_create': True, 'open_action': 'action_open_bom_form'}"/>
+                <field name="sale_order_quantity"/>
+                <field name="sale_order_refs" widget="many2many_tags" options="{'no_create': True, 'open_action': 'action_open_sale_order_form'}"/>
+                <field name="purchase_order_quantity"/>
+                <field name="purchase_order_refs" widget="many2many_tags" options="{'no_create': True, 'open_action': 'action_open_purchase_order_form'}"/>
+                <field name="reserved_quantity"/>
+                <field name="stock_on_hand"/>
+                <field name="being_manufactured"/>
+                <field name="manufacturing_order_refs" widget="many2many_tags" options="{'no_create': True, 'open_action': 'action_open_manufacturing_order_form'}"/>
+                <field name="bom_quantity"/>
+                <field name="forecast_quantity"/>
+            </calendar>
+        </field>
+    </record>
+
+    <!-- Form View for Custom Calendar Report -->
+    <record id="view_custom_calendar_report_form" model="ir.ui.view">
+        <field name="name">custom.calendar.report.form</field>
+        <field name="model">custom.calendar.report</field>
+        <field name="arch" type="xml">
+            <form string="Custom Calendar Report">
+                <sheet>
+                    <group>
+                        <field name="date"/>
+                        <field name="product_id"/>
+                        <field name="used_in_refs" widget="many2many_tags_buttons" options="{'no_create': True, 'open_action': 'action_open_product_form'}"/>
+                    </group>
+                    <group>
+                        <field name="sale_order_quantity"/>
+                        <field name="sale_order_refs" widget="many2many_tags_buttons" options="{'no_create': True, 'open_action': 'action_open_sale_order_form'}"/>
+                    </group>
+                    <group>
+                        <field name="purchase_order_quantity"/>
+                        <field name="purchase_order_refs" widget="many2many_tags_buttons" options="{'no_create': True, 'open_action': 'action_open_purchase_order_form'}"/>
+                    </group>
+                    <group>
+                        <field name="stock_on_hand"/>
+                        <field name="reserved_quantity"/>
+                        <field name="being_manufactured"/>
+                        <field name="manufacturing_order_refs" widget="many2many_tags_buttons" options="{'no_create': True, 'open_action': 'action_open_manufacturing_order_form'}"/>
+                    </group>
+                    <group>
+                        <field name="bom_refs" widget="many2many_tags_buttons" options="{'no_create': True, 'open_action': 'action_open_bom_form'}"/>
+                        <field name="bom_quantity"/>
+                        <field name="forecast_quantity"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Tree View for Custom Calendar Report -->
+    <record id="view_custom_calendar_report_tree" model="ir.ui.view">
+        <field name="name">custom.calendar.report.tree</field>
+        <field name="model">custom.calendar.report</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="date"/>
+                <field name="product_id"/>
+                <field name="used_in_refs" widget="many2many_tags" options="{'no_create': True, 'open_action': 'action_open_product_form'}"/>
+                <field name="bom_refs" widget="many2many_tags" options="{'no_create': True, 'open_action': 'action_open_bom_form'}"/>
+                <field name="sale_order_quantity"/>
+                <field name="sale_order_refs" widget="many2many_tags" options="{'no_create': True, 'open_action': 'action_open_sale_order_form'}"/>
+                <field name="purchase_order_quantity"/>
+                <field name="purchase_order_refs" widget="many2many_tags" options="{'no_create': True, 'open_action': 'action_open_purchase_order_form'}"/>
+                <field name="reserved_quantity"/>
+                <field name="stock_on_hand"/>
+                <field name="being_manufactured"/>
+                <field name="manufacturing_order_refs" widget="many2many_tags" options="{'no_create': True, 'open_action': 'action_open_manufacturing_order_form'}"/>
+                <field name="bom_quantity"/>
+                <field name="forecast_quantity"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- Action for the Calendar View -->
+    <record id="action_custom_calendar_report" model="ir.actions.act_window">
+        <field name="name">Custom Calendar Report</field>
+        <field name="res_model">custom.calendar.report</field>
+        <field name="view_mode">calendar,tree,form</field>
+        <field name="view_id" ref="view_custom_calendar_report_calendar"/>
+    </record>
+
+    <!-- Menu Items -->
+    <menuitem id="menu_custom_calendar_report_root" name="Custom Calendar Report" sequence="10"/>
+    <menuitem id="menu_custom_calendar_report_view" name="Calendar Report" parent="menu_custom_calendar_report_root" action="action_custom_calendar_report" sequence="1"/>
+    
+    <!-- Action to open sale order form in pop-up -->
+    <record id="action_open_sale_order_form" model="ir.actions.act_window">
+        <field name="name">Sale Order</field>
+        <field name="res_model">sale.order</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Action to open purchase order form in pop-up -->
+    <record id="action_open_purchase_order_form" model="ir.actions.act_window">
+        <field name="name">Purchase Order</field>
+        <field name="res_model">purchase.order</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Action to open manufacturing order form in pop-up -->
+    <record id="action_open_manufacturing_order_form" model="ir.actions.act_window">
+        <field name="name">Manufacturing Order</field>
+        <field name="res_model">mrp.production</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Action to open BoM form in pop-up -->
+    <record id="action_open_bom_form" model="ir.actions.act_window">
+        <field name="name">Bill of Materials</field>
+        <field name="res_model">mrp.bom</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Action to open Product form in pop-up -->
+    <record id="action_open_product_form" model="ir.actions.act_window">
+        <field name="name">Product</field>
+        <field name="res_model">product.product</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>
