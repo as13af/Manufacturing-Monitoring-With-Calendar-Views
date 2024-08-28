@@ -259,63 +259,76 @@ class StockPicking(models.Model):
             picking._update_custom_calendar_report()
 
         return res
-
+    
     def _update_custom_calendar_report(self, remove=False):
         for picking in self:
             for move in picking.move_lines:
                 product_id = move.product_id.id
-                scheduled_date = picking.scheduled_date.date() if picking.scheduled_date else fields.Date.today()
-
-                # Search for an existing report entry for this product on the scheduled date
-                report = self.env['custom.calendar.report'].search([
-                    ('product_id', '=', product_id),
-                    ('date', '=', scheduled_date)
-                ], limit=1)
                 
-                if remove:
-                    # If removing, adjust quantities and references accordingly
-                    if report:
-                        _logger.info('Removing quantities for report ID %s on date %s for product %s', report.id, scheduled_date, product_id)
-                        if picking.picking_type_id.code == 'incoming':
-                            report.purchase_order_quantity -= move.product_qty
-                            if move.purchase_line_id:
-                                report.purchase_order_refs = [(3, move.purchase_line_id.order_id.id)]
-                        elif picking.picking_type_id.code == 'outgoing':
-                            report.sale_order_quantity -= move.product_uom_qty
+                # Ensure the scheduled date is set, default to today if missing
+                scheduled_date = picking.scheduled_date.date() if picking.scheduled_date else False
+                if not scheduled_date:
+                    scheduled_date = fields.Date.today()
+                    _logger.info('Scheduled date was missing, defaulting to today: %s', scheduled_date)
+
+                if scheduled_date:
+                    if remove:
+                        old_reports = self.env['custom.calendar.report'].search([
+                            ('product_id', '=', product_id),
+                            ('date', '=', scheduled_date)
+                        ])
+                        for report in old_reports:
+                            _logger.info('Removing quantities for report ID %s on date %s for product %s', report.id, scheduled_date, product_id)
+
+                            # Update quantities
+                            report.sale_order_quantity -= move.sale_line_id.product_uom_qty if move.sale_line_id else 0.0
+                            report.purchase_order_quantity -= move.purchase_line_id.product_qty if move.purchase_line_id else 0.0
+
+                            # Update references
                             if move.sale_line_id:
                                 report.sale_order_refs = [(3, move.sale_line_id.order_id.id)]
-                        
-                        # Unlink the report if all quantities are zero
-                        if not any([report.sale_order_quantity, report.purchase_order_quantity]):
-                            _logger.info('Unlinking report ID %s as all quantities are zero', report.id)
-                            report.unlink()
-                        else:
-                            _logger.info('Updated report ID %s with remaining quantities', report.id)
-                else:
-                    if not report:
-                        # Create a new report entry if it doesn't exist
-                        report = self.env['custom.calendar.report'].create({
-                            'product_id': product_id,
-                            'date': scheduled_date,
-                            'sale_order_quantity': move.product_uom_qty if picking.picking_type_id.code == 'outgoing' else 0.0,
-                            'purchase_order_quantity': move.product_qty if picking.picking_type_id.code == 'incoming' else 0.0,
-                            'sale_order_refs': [(4, move.sale_line_id.order_id.id)] if move.sale_line_id else [],
-                            'purchase_order_refs': [(4, move.purchase_line_id.order_id.id)] if move.purchase_line_id else [],
-                        })
-                        _logger.info('Created new report ID %s for product %s on date %s', report.id, product_id, scheduled_date)
-                    else:
-                        _logger.info('Updating existing report ID %s for product %s on date %s', report.id, product_id, scheduled_date)
-
-                        # Update quantities in the existing report
-                        if picking.picking_type_id.code == 'incoming':
-                            report.purchase_order_quantity += move.product_qty
                             if move.purchase_line_id:
-                                report.purchase_order_refs = [(4, move.purchase_line_id.order_id.id)]
-                        elif picking.picking_type_id.code == 'outgoing':
-                            report.sale_order_quantity += move.product_uom_qty
+                                report.purchase_order_refs = [(3, move.purchase_line_id.order_id.id)]
+
+                            # Unlink the report if all quantities are zero
+                            if not any([
+                                report.sale_order_quantity,
+                                report.purchase_order_quantity
+                            ]):
+                                _logger.info('Unlinking report ID %s as all quantities are zero', report.id)
+                                report.unlink()
+                            else:
+                                _logger.info('Updated report ID %s with remaining quantities', report.id)
+                    else:
+                        report = self.env['custom.calendar.report'].search([
+                            ('product_id', '=', product_id),
+                            ('date', '=', scheduled_date)
+                        ], limit=1)
+                        
+                        if not report:
+                            # Create a new report entry if it doesn't exist
+                            report = self.env['custom.calendar.report'].create({
+                                'product_id': product_id,
+                                'date': scheduled_date,
+                                'sale_order_quantity': move.sale_line_id.product_uom_qty if move.sale_line_id else 0.0,
+                                'purchase_order_quantity': move.purchase_line_id.product_qty if move.purchase_line_id else 0.0,
+                                'sale_order_refs': [(4, move.sale_line_id.order_id.id)] if move.sale_line_id else [],
+                                'purchase_order_refs': [(4, move.purchase_line_id.order_id.id)] if move.purchase_line_id else [],
+                            })
+                            _logger.info('Created new report ID %s for product %s on date %s', report.id, product_id, scheduled_date)
+                        else:
+                            _logger.info('Updating existing report ID %s for product %s on date %s', report.id, product_id, scheduled_date)
+                            
+                            # Update quantities in the existing report
+                            report.sale_order_quantity += move.sale_line_id.product_uom_qty if move.sale_line_id else 0.0
+                            report.purchase_order_quantity += move.purchase_line_id.product_qty if move.purchase_line_id else 0.0
+
+                            # Add references to the report
                             if move.sale_line_id:
                                 report.sale_order_refs = [(4, move.sale_line_id.order_id.id)]
-                        
+                            if move.purchase_line_id:
+                                report.purchase_order_refs = [(4, move.purchase_line_id.order_id.id)]
+
     def _remove_old_custom_calendar_report(self, old_date):
         for picking in self:
             for move in picking.move_lines:
@@ -327,8 +340,8 @@ class StockPicking(models.Model):
                     ])
                     for report in old_reports:
                         _logger.info('Processing old report ID %s for product %s on date %s', report.id, product_id, old_date)
-                        report.sale_order_quantity -= move.product_uom_qty if move.sale_line_id else 0.0
-                        report.purchase_order_quantity -= move.product_qty if move.purchase_line_id else 0.0
+                        report.sale_order_quantity -= move.sale_line_id.product_uom_qty if move.sale_line_id else 0.0
+                        report.purchase_order_quantity -= move.purchase_line_id.product_qty if move.purchase_line_id else 0.0
 
                         if move.sale_line_id:
                             report.sale_order_refs = [(3, move.sale_line_id.order_id.id)]
@@ -516,8 +529,12 @@ class PurchaseOrder(models.Model):
                     product = move_line.product_id
                     product.with_company(order.company_id).qty_available += move_line.product_qty
                     _logger.info('Updated stock on hand for product: %s, new quantity: %s', product.name, product.qty_available)
+                
+                # Trigger the update of the custom calendar report
+                picking._update_custom_calendar_report()
 
         return res
+
 
 
 class SaleOrder(models.Model):
