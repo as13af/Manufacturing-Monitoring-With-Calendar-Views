@@ -18,6 +18,7 @@ class CustomCalendarReport(models.Model):
     reserved_quantity = fields.Float(string='Reserved Quantity', compute='_compute_reserved_quantity', store=True)
     bom_quantity = fields.Float(string='BoM Quantity', compute='_compute_bom_quantity', store=True)
     forecast_quantity = fields.Float(string='Forecast Quantity', compute='_compute_forecast_quantity', store=True)
+    today_current_stock = fields.Float(string='Current Stock\'s Left', compute='_compute_today_current_stock', store=True)    
     sale_order_refs = fields.Many2many('sale.order', string='Sale Orders', compute='_compute_sale_order_quantity', store=True)
     purchase_order_refs = fields.Many2many('purchase.order', string='Purchase Orders', compute='_compute_purchase_order_quantity', store=True)
     manufacturing_order_refs = fields.Many2many('mrp.production', string='Manufacturing Orders', compute='_compute_being_manufactured', store=True)
@@ -157,37 +158,31 @@ class CustomCalendarReport(models.Model):
 
             _logger.info('Used In references: %s', record.used_in_refs)
 
-    @api.depends('date', 'sale_order_quantity', 'purchase_order_quantity', 'being_manufactured')
+    @api.depends('product_id', 'date')
     def _compute_forecast_quantity(self):
         for record in self:
-            # Calculate forecast quantity based on virtual available
-            record.forecast_quantity = record.product_id.virtual_available
+            if not record.product_id or not record.date:
+                record.forecast_quantity = 0.0
+                _logger.info("Computed forecast_quantity: 0.0 for product_id: %s on date: %s (product_id or date missing)", record.product_id.id, record.date)
+                continue
 
-            # Consider only scheduled deliveries and manufacturing for the specific date
-            if record.date:
-                start_of_day = datetime.combine(record.date, datetime.min.time())
-                end_of_day = start_of_day + timedelta(days=1)
+            # Forecast based on virtual available
+            record.forecast_quantity = record.product_id.virtual_available or 0.0
 
-                scheduled_pickings = self.env['stock.picking'].search([
-                    ('move_lines.product_id', '=', record.product_id.id),
-                    ('picking_type_id.code', 'in', ['incoming', 'outgoing']),
-                    ('scheduled_date', '>=', start_of_day),
-                    ('scheduled_date', '<', end_of_day)
-                ])
-                scheduled_quantity = sum(move.product_uom_qty for move in scheduled_pickings.mapped('move_lines'))
+            _logger.info("Computed forecast_quantity: %s for product_id: %s on date: %s", record.forecast_quantity, record.product_id.id, record.date)
+    
+    @api.depends('date', 'stock_on_hand', 'purchase_order_quantity', 'sale_order_quantity', 'being_manufactured')
+    def _compute_today_current_stock(self):
+        for record in self:
+            stock_on_hand = record.stock_on_hand
+            purchase = record.purchase_order_quantity
+            sale = record.sale_order_quantity
+            being_manufactured = record.being_manufactured
 
-                manufacturing_orders = self.env['mrp.production'].search([
-                    ('product_id', '=', record.product_id.id),
-                    ('date_planned_start', '>=', start_of_day),
-                    ('date_planned_start', '<', end_of_day)
-                ])
-                manufactured_quantity = sum(prod.product_qty for prod in manufacturing_orders)
+            # Compute today's current stock
+            record.today_current_stock = stock_on_hand + purchase - sale + being_manufactured
 
-                # Update forecast considering scheduled deliveries and manufacturing for the specific date
-                record.forecast_quantity += scheduled_quantity - manufactured_quantity
-
-            _logger.info('Computed forecast_quantity for %s on %s: %s', record.product_id.name, record.date, record.forecast_quantity)
-
+            _logger.info('Computed today_current_stock: %s for product_id: %s on date: %s', record.today_current_stock, record.product_id.id, record.date)
 
 class StockPicking(models.Model):
     _inherit = 'stock.picking'
